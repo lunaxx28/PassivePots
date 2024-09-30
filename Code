@@ -1,1 +1,111 @@
+import time
+import pandas as pd
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+
+# Path for WebDriver (Adjust the path accordingly)
+driver_path = 'chromedriver'  # Update to the correct path of your chromedriver
+
+# URL to test
+url = "https://example.com"  # Replace with the actual URL
+
+# Credentials
+username = "your_username"
+password = "your_password"
+
+# Define the path for your CSV and Excel files
+csv_file_path = 'website_loading_report.csv'
+excel_file_path = 'website_loading_report.xls'
+
+# Initialize WebDriver (example using Chrome, change to Firefox if needed)
+driver = webdriver.Chrome(executable_path=driver_path)
+
+try:
+    while True:
+        # Get user input for the number of trials
+        number_of_trials = int(input("Enter the number of trials you want to run: "))
+        
+        # Initialize an empty list to collect all the records
+        data_records = []
+
+        # Loop for the specified number of trials
+        for trial in range(1, number_of_trials + 1):
+            record = {}
+            print(f"Trial {trial} started...")
+
+            try:
+                # Start the timer
+                start_time = time.time()
+                
+                # Load the URL
+                driver.get(url)
+                
+                # Wait until the page is fully loaded by checking the page state
+                timeout = 30  # Maximum wait time (in seconds) to load the page
+                while True:
+                    if driver.execute_script("return document.readyState") == "complete":
+                        break
+                    time.sleep(0.5)
+                    if time.time() - start_time > timeout:
+                        raise TimeoutException("Page load timeout")
+
+                # End time after page fully loaded
+                end_time = time.time()
+                
+                # Calculate the loading time duration
+                loading_duration = round(end_time - start_time, 2)
+                
+                # Try to enter the username and password
+                try:
+                    driver.find_element(By.ID, "username").send_keys(username)  # Adjust the selector as per the actual page
+                    driver.find_element(By.ID, "password").send_keys(password)  # Adjust the selector as per the actual page
+                    login_status = "Success"
+                except NoSuchElementException:
+                    login_status = "Failed - Elements not found"
+
+                # Capture trial details
+                record['Trial'] = trial
+                record['Start Time'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))
+                record['End Time'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(end_time))
+                record['Loading Duration (s)'] = loading_duration
+                record['Load Status'] = 'Success'
+                record['Login Status'] = login_status
+                record['Remarks'] = "Page loaded and attempted login successfully" if login_status == "Success" else "Failed to find login elements"
+
+            except TimeoutException:
+                # If page fails to load within the timeout period
+                end_time = time.time()
+                loading_duration = round(end_time - start_time, 2)
+                
+                # Capture trial details
+                record['Trial'] = trial
+                record['Start Time'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))
+                record['End Time'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(end_time))
+                record['Loading Duration (s)'] = loading_duration
+                record['Load Status'] = 'Failed'
+                record['Login Status'] = 'N/A'
+                record['Remarks'] = "Page failed to load within the timeout period"
+
+            # Append this trial's data to the records list
+            data_records.append(record)
+
+        # Convert the data to a DataFrame
+        df = pd.DataFrame(data_records)
+
+        # Save the data to CSV file
+        df.to_csv(csv_file_path, index=False)
+        print(f"Data has been saved to {csv_file_path}")
+
+        # Convert the CSV file to an Excel (.xls) file
+        df.to_excel(excel_file_path, index=False)
+        print(f"CSV file has been converted to Excel and saved as {excel_file_path}")
+
+        # Ask the user whether to continue or stop
+        continue_running = input("Do you want to run another set of trials? (yes/no): ").strip().lower()
+        if continue_running != 'yes':
+            break
+finally:
+    # Always close the driver when done
+    driver.quit()
 
